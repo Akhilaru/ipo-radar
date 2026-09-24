@@ -9,6 +9,7 @@ class GmpObservation(BaseModel):
     ipo_id: int
     gmp: float = Field(ge=0)
     gmp_percentage: float | None = None
+    estimated_listing_price: float | None = Field(default=None, ge=0)
     source: str = Field(min_length=1)
     retrieved_at: datetime
     source_updated_at: datetime | None = None
