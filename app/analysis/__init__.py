@@ -1,6 +1,9 @@
 """Read-only analysis layer for trend calculations."""
 
 from app.analysis.trends import (
+    FRESH_THRESHOLD,
+    AGING_THRESHOLD,
+    Freshness,
     GmpAnalysis,
     Momentum,
     SubscriptionAnalysis,
@@ -9,10 +12,14 @@ from app.analysis.trends import (
     TrendResult,
     analyze_gmp_history,
     analyze_subscription_history,
+    calculate_freshness,
     calculate_trend,
 )
 
 __all__ = [
+    "FRESH_THRESHOLD",
+    "AGING_THRESHOLD",
+    "Freshness",
     "GmpAnalysis",
     "Momentum",
     "SubscriptionAnalysis",
@@ -21,5 +28,6 @@ __all__ = [
     "TrendResult",
     "analyze_gmp_history",
     "analyze_subscription_history",
+    "calculate_freshness",
     "calculate_trend",
 ]

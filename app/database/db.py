@@ -36,7 +36,8 @@ CREATE TABLE IF NOT EXISTS gmp_history (
     source TEXT NOT NULL,
     retrieved_at TEXT NOT NULL,
     source_updated_at TEXT,
-    UNIQUE(ipo_id, source, source_updated_at)
+    collection_date TEXT NOT NULL,
+    UNIQUE(ipo_id, source, collection_date)
 );
 CREATE TABLE IF NOT EXISTS subscription_history (
     id INTEGER PRIMARY KEY,
@@ -45,7 +46,8 @@ CREATE TABLE IF NOT EXISTS subscription_history (
     source TEXT NOT NULL,
     retrieved_at TEXT NOT NULL,
     source_updated_at TEXT,
-    UNIQUE(ipo_id, source, source_updated_at)
+    collection_date TEXT NOT NULL,
+    UNIQUE(ipo_id, source, collection_date)
 );
 CREATE TABLE IF NOT EXISTS news_articles (
     id INTEGER PRIMARY KEY,
@@ -107,6 +109,8 @@ _MIGRATIONS = [
     "ALTER TABLE ipos ADD COLUMN slug TEXT",
     "ALTER TABLE ipos ADD COLUMN allotment_date TEXT",
     "ALTER TABLE gmp_history ADD COLUMN estimated_listing_price REAL",
+    "ALTER TABLE gmp_history ADD COLUMN collection_date TEXT",
+    "ALTER TABLE subscription_history ADD COLUMN collection_date TEXT",
 ]
 
 
@@ -137,18 +141,87 @@ def _apply_migrations(connection: sqlite3.Connection) -> None:
             if "duplicate column" in message:
                 continue
             raise
+    _migrate_history_table(connection, "gmp_history", is_gmp=True)
+    _migrate_history_table(connection, "subscription_history", is_gmp=False)
+    _drop_index_if_exists(connection, "uq_gmp_ipo_source_updated")
+    _drop_index_if_exists(connection, "uq_sub_ipo_source_updated")
     _ensure_unique_index(
         connection,
         "gmp_history",
-        "uq_gmp_ipo_source_updated",
-        "(ipo_id, source, source_updated_at)",
+        "uq_gmp_ipo_source_collection",
+        "(ipo_id, source, collection_date)",
     )
     _ensure_unique_index(
         connection,
         "subscription_history",
-        "uq_sub_ipo_source_updated",
-        "(ipo_id, source, source_updated_at)",
+        "uq_sub_ipo_source_collection",
+        "(ipo_id, source, collection_date)",
     )
+
+
+def _migrate_history_table(
+    connection: sqlite3.Connection, table: str, is_gmp: bool
+) -> None:
+    """Rebuild a legacy history table whose inline uniqueness used source_updated_at."""
+    columns = connection.execute(f"PRAGMA table_info({table})").fetchall()
+    if not columns or "collection_date" not in {row[1] for row in columns}:
+        return
+
+    sql = connection.execute(
+        "SELECT sql FROM sqlite_master WHERE type='table' AND name=?", (table,)
+    ).fetchone()[0]
+    normalized_sql = "".join(sql.split()).lower()
+    if "unique(ipo_id,source,source_updated_at)" not in normalized_sql:
+        connection.execute(
+            f"UPDATE {table} SET collection_date = substr(retrieved_at, 1, 10) "
+            "WHERE collection_date IS NULL"
+        )
+        return
+
+    temp = f"{table}_legacy_backup"
+    connection.execute(f"ALTER TABLE {table} RENAME TO {temp}")
+    if is_gmp:
+        connection.execute("""CREATE TABLE gmp_history (
+            id INTEGER PRIMARY KEY,
+            ipo_id INTEGER NOT NULL REFERENCES ipos(id),
+            gmp REAL NOT NULL,
+            gmp_percentage REAL,
+            estimated_listing_price REAL,
+            source TEXT NOT NULL,
+            retrieved_at TEXT NOT NULL,
+            source_updated_at TEXT,
+            collection_date TEXT NOT NULL,
+            UNIQUE(ipo_id, source, collection_date)
+        )""")
+        connection.execute("""INSERT INTO gmp_history
+            (id, ipo_id, gmp, gmp_percentage, estimated_listing_price, source,
+             retrieved_at, source_updated_at, collection_date)
+            SELECT id, ipo_id, gmp, gmp_percentage, estimated_listing_price, source,
+                   retrieved_at, source_updated_at, substr(retrieved_at, 1, 10)
+            FROM gmp_history_legacy_backup""")
+    else:
+        connection.execute("""CREATE TABLE subscription_history (
+            id INTEGER PRIMARY KEY,
+            ipo_id INTEGER NOT NULL REFERENCES ipos(id),
+            retail REAL, nii REAL, qib REAL, employee REAL, other REAL, total REAL,
+            source TEXT NOT NULL,
+            retrieved_at TEXT NOT NULL,
+            source_updated_at TEXT,
+            collection_date TEXT NOT NULL,
+            UNIQUE(ipo_id, source, collection_date)
+        )""")
+        connection.execute("""INSERT INTO subscription_history
+            (id, ipo_id, retail, nii, qib, employee, other, total, source,
+             retrieved_at, source_updated_at, collection_date)
+            SELECT id, ipo_id, retail, nii, qib, employee, other, total, source,
+                   retrieved_at, source_updated_at, substr(retrieved_at, 1, 10)
+            FROM subscription_history_legacy_backup""")
+    connection.execute(f"DROP TABLE {temp}")
+
+
+def _drop_index_if_exists(connection: sqlite3.Connection, index_name: str) -> None:
+    """Drop a legacy index if present."""
+    connection.execute(f"DROP INDEX IF EXISTS {index_name}")
 
 
 def _ensure_unique_index(
