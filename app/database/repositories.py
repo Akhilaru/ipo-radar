@@ -75,8 +75,8 @@ class GmpRepository:
             self.connection.execute(
                 """INSERT INTO gmp_history
                 (ipo_id, gmp, gmp_percentage, estimated_listing_price,
-                 source, retrieved_at, source_updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                 source, retrieved_at, source_updated_at, collection_date)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
                     observation.ipo_id,
                     observation.gmp,
@@ -85,6 +85,7 @@ class GmpRepository:
                     observation.source,
                     observation.retrieved_at.isoformat(),
                     observation.source_updated_at.isoformat() if observation.source_updated_at else None,
+                    observation.retrieved_at.date().isoformat(),
                 ),
             )
             return True
@@ -108,8 +109,8 @@ class SubscriptionRepository:
             self.connection.execute(
                 """INSERT INTO subscription_history
                 (ipo_id, retail, nii, qib, employee, other, total,
-                 source, retrieved_at, source_updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                 source, retrieved_at, source_updated_at, collection_date)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
                     observation.ipo_id,
                     observation.retail,
@@ -121,6 +122,7 @@ class SubscriptionRepository:
                     observation.source,
                     observation.retrieved_at.isoformat(),
                     observation.source_updated_at.isoformat() if observation.source_updated_at else None,
+                    observation.retrieved_at.date().isoformat(),
                 ),
             )
             return True

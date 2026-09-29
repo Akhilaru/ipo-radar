@@ -14,6 +14,10 @@ def main() -> None:
         required=True,
         choices=("daily", "last-day-10am", "last-day-1pm", "analyze"),
     )
+    parser.add_argument(
+        "--ipo",
+        help="IPO slug for detailed analysis (only used with --job analyze)",
+    )
     args = parser.parse_args()
     settings = Settings.from_env()
     configure_logging(settings.log_level)
@@ -24,7 +28,7 @@ def main() -> None:
     elif args.job == "last-day-1pm":
         last_day.run(settings, "1pm")
     elif args.job == "analyze":
-        analyze.run(settings)
+        analyze.run(settings, ipo_slug=args.ipo)
 
 
 if __name__ == "__main__":

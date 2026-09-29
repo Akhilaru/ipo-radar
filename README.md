@@ -74,6 +74,7 @@ The system enforces IPO Guru's actual free-tier limits:
 ## Deduplication
 
 GMP and subscription observations use database uniqueness constraints:
-- `UNIQUE(ipo_id, source, source_updated_at)` for both tables
+- `UNIQUE(ipo_id, source, collection_date)` for both tables
 - Identical observations are not duplicated
 - Historical changes are preserved (e.g., GMP ₹10 → ₹12 → ₹15 over time)
+
